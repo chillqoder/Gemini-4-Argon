@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="en" data-polarity="oxide">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KOMA//99 — Post-Syntax Software &amp; Vibe Architecture Foundry</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%230B0B09'/%3E%3Cpolygon points='4,4 28,4 28,28 16,28 4,16' fill='%23FF2E00'/%3E%3Ccircle cx='16' cy='16' r='5' fill='%23D4FF00'/%3E%3C/svg%3E" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:ital,wght@0,400;0,600;0,700;1,400&family=Space+Grotesk:wght@400;500;700&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+  <script type="module" crossorigin src="/assets/index-IjHgPkNb.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index-BCYzpsFI.css">
+</head>
+<body>
+  <!-- SVG Filters & Architectural Pattern Definitions -->
+  <svg class="svg-defs" aria-hidden="true">
+    <defs>
+      <pattern id="blueprint-grid" width="48" height="48" patternUnits="userSpaceOnUse">
+        <path d="M 48 0 L 0 0 0 48" fill="none" stroke="currentColor" stroke-width="0.6" stroke-opacity="0.12" />
+        <circle cx="48" cy="48" r="1" fill="currentColor" fill-opacity="0.28" />
+      </pattern>
+      <filter id="crt-aberration">
+        <feOffset in="SourceGraphic" dx="1.2" dy="0" result="red" />
+        <feOffset in="SourceGraphic" dx="-1.2" dy="0" result="blue" />
+        <feBlend mode="screen" in="red" in2="blue" />
+      </filter>
+    </defs>
+  </svg>
+
+  <!-- Full-Viewport 3D WebGL Stage -->
+  <canvas id="webgl-stage" aria-label="Interactive 3D Ferrofluid &amp; Gyroscopic Vibe Sculpture"></canvas>
+
+  <!-- Architectural Blueprint Grid & Registration Marks Layer -->
+  <div class="blueprint-backdrop" aria-hidden="true">
+    <svg class="blueprint-svg" width="100%" height="100%">
+      <rect width="100%" height="100%" fill="url(#blueprint-grid)" />
+    </svg>
+    <div class="reg-mark reg-tl">+ K99//NW</div>
+    <div class="reg-mark reg-tr">+ K99//NE</div>
+    <div class="reg-mark reg-bl">+ K99//SW</div>
+    <div class="reg-mark reg-br">+ K99//SE</div>
+  </div>
+
+  <!-- Live 3D-to-2D Projected Leader Lines & Reticles SVG -->
+  <svg id="hud-leader-svg" class="hud-leader-svg" aria-hidden="true"></svg>
+
+  <!-- Mechanical Aperture Transition Shutter -->
+  <div id="aperture-shutter" class="aperture-shutter" aria-hidden="true">
+    <div class="shutter-blade blade-top"></div>
+    <div class="shutter-blade blade-bottom"></div>
+    <div class="shutter-readout" id="shutter-readout">SLEWING ORBITAL CAMERA // AZ 060.0°</div>
+  </div>
+
+  <!-- Custom Spatial Cursor Reticle -->
+  <div id="cursor-reticle" class="cursor-reticle" aria-hidden="true">
+    <span class="reticle-ring"></span>
+    <span class="reticle-coords" id="cursor-coords">X:000 Y:000</span>
+  </div>
+
+  <!-- =====================================================================
+       PERIMETER INSTRUMENT SHELL (NON-STANDARD WORKBENCH FRAME)
+       ===================================================================== -->
+  <div class="workbench-shell">
+
+    <!-- TOP RAIL: TELEMETRY BUS, POLARITY THROW-SWITCH & AUDIO DSP -->
+    <header class="rail-top">
+      <div class="brand-lockup" id="brand-home-trigger" role="button" tabindex="0" title="Return to Chamber 00">
+        <span class="brand-badge">KOMA//99</span>
+        <div class="brand-meta">
+          <span class="brand-title">POST-SYNTAX VIBE FOUNDRY</span>
+          <span class="brand-sub">ZÜRICH · TOKYO · SAN FRANCISCO // EST. 2026</span>
+        </div>
+      </div>
+
+      <div class="telemetry-strip">
+        <div class="tele-cell">
+          <span class="tele-label">ACTIVE CHAMBER</span>
+          <span class="tele-val" id="hud-chamber-code">CH.00 // TRANSDUCER</span>
+        </div>
+        <div class="tele-cell">
+          <span class="tele-label">ORBITAL VECTOR</span>
+          <span class="tele-val" id="hud-chamber-coord">AZ 000.0° // EL +14.2°</span>
+        </div>
+        <div class="tele-cell hide-compact">
+          <span class="tele-label">MANUAL SYNTAX</span>
+          <span class="tele-val accent-volt">0.00% // PURE INTENT</span>
+        </div>
+      </div>
+
+      <div class="rail-controls">
+        <div class="polarity-selector" role="group" aria-label="Chromatic Polarity State">
+          <span class="ctrl-caption">SPECTRAL BUS:</span>
+          <button class="polarity-btn is-active" data-polarity-btn="oxide" title="Swiss Oxide &amp; Vermilion">OXIDE</button>
+          <button class="polarity-btn" data-polarity-btn="cobalt" title="Cobalt Cybernetics">COBALT</button>
+          <button class="polarity-btn" data-polarity-btn="infrared" title="Thermal Infrared">INFRARED</button>
+          <button class="polarity-btn" data-polarity-btn="risograph" title="Alabaster Risograph Print">RISO</button>
+        </div>
+
+        <button id="audio-toggle-btn" class="audio-toggle-btn is-armed" type="button">
+          <span class="led-dot"></span>
+          <span id="audio-toggle-label">DSP AUDIO: ARMED</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- LEFT RAIL: ORBITAL CHAMBER TURRET & ROTARY COMPASS -->
+    <aside class="rail-left" aria-label="Spatial Chamber Navigation">
+      <div class="compass-turret">
+        <svg class="compass-svg" viewBox="0 0 120 120">
+          <circle cx="60" cy="60" r="52" fill="none" stroke="currentColor" stroke-width="1" stroke-dasharray="3 4" opacity="0.4" />
+          <circle cx="60" cy="60" r="38" fill="none" stroke="currentColor" stroke-width="1" opacity="0.25" />
+          <g id="compass-rotor" class="compass-rotor">
+            <line x1="60" y1="8" x2="60" y2="26" stroke="var(--accent-primary)" stroke-width="2.5" />
+            <polygon points="60,4 55,14 65,14" fill="var(--accent-primary)" />
+            <circle cx="60" cy="60" r="5" fill="var(--accent-secondary)" />
+          </g>
+        </svg>
+        <div class="compass-readout">
+          <span class="compass-deg" id="compass-deg">000°</span>
+          <span class="compass-hint">SCROLL / CLICK</span>
+        </div>
+      </div>
+
+      <nav class="chamber-turret-nav" id="chamber-nav">
+        <button class="turret-step is-active" data-chamber-target="0">
+          <span class="step-index">00</span>
+          <span class="step-name">TRANSDUCER</span>
+          <span class="step-sub">LIVE COMPILER</span>
+        </button>
+        <button class="turret-step" data-chamber-target="1">
+          <span class="step-index">01</span>
+          <span class="step-name">SPECIMENS</span>
+          <span class="step-sub">ROM VAULT (5)</span>
+        </button>
+        <button class="turret-step" data-chamber-target="2">
+          <span class="step-index">02</span>
+          <span class="step-name">INCINERATOR</span>
+          <span class="step-sub">KILL BOILERPLATE</span>
+        </button>
+        <button class="turret-step" data-chamber-target="3">
+          <span class="step-index">03</span>
+          <span class="step-name">ANATOMY</span>
+          <span class="step-sub">4-STRATUM CORE</span>
+        </button>
+        <button class="turret-step" data-chamber-target="4">
+          <span class="step-index">04</span>
+          <span class="step-name">MANIFESTO</span>
+          <span class="step-sub">7 LAWS OF FEELING</span>
+        </button>
+        <button class="turret-step" data-chamber-target="5">
+          <span class="step-index">05</span>
+          <span class="step-name">TRANSMIT</span>
+          <span class="step-sub">COMMISSION SIGNAL</span>
+        </button>
+      </nav>
+
+      <div class="rail-left-footer">
+        <button class="step-cycle-btn" id="prev-chamber-btn" title="Previous Chamber [↑]">▲ PREV</button>
+        <button class="step-cycle-btn" id="next-chamber-btn" title="Next Chamber [↓]">▼ NEXT</button>
+      </div>
+    </aside>
+
+    <!-- =====================================================================
+         CENTRAL SPATIAL STAGE: 6 NON-LINEAR CHAMBERS
+         ===================================================================== -->
+    <main class="spatial-stage-container" id="spatial-stage-container">
+
+      <!-- -------------------------------------------------------------------
+           CHAMBER 00: THE INTENT TRANSDUCER (LIVE VIBE-TO-REALITY SYNTH)
+           ------------------------------------------------------------------- -->
+      <section class="chamber is-active" id="chamber-0" data-chamber="0" aria-label="Chamber 00: Intent Transducer">
+        <div class="ch0-layout">
+          <!-- Left Architectural Monolith Statement -->
+          <div class="monolith-plate chamfer-plate">
+            <div class="plate-header">
+              <span class="plate-tag">SIGNAL // 0x00</span>
+              <span class="plate-coord">LAT 47.3769° N // LON 8.5417° E</span>
+            </div>
+
+            <h1 class="hero-statement" data-scramble-target>
+              WE DON’T WRITE CODE.<br />
+              <span class="serif-italic">We hallucinate</span> WORKING REALITIES INTO SILICON.
+            </h1>
+
+            <p class="hero-lead">
+              <strong>KOMA//99</strong> is a post-syntax software foundry. While traditional agencies burn 14 weeks debating Jira tickets and CSS tokens, we conduct autonomous coding swarms, custom GLSL shaders, and psychoacoustic physics to ship category-defining products in <strong>&lt; 96 hours</strong>.
+            </p>
+
+            <div class="hero-stat-band">
+              <div class="stat-brick">
+                <span class="stat-num">72<small>HRS</small></span>
+                <span class="stat-caption">MEDIAN CONCEPT-TO-PROD</span>
+              </div>
+              <div class="stat-brick">
+                <span class="stat-num">0<small>LINES</small></span>
+                <span class="stat-caption">BOILERPLATE WRITTEN BY HAND</span>
+              </div>
+              <div class="stat-brick">
+                <span class="stat-num">120<small>FPS</small></span>
+                <span class="stat-caption">BESPOKE SHADER TARGET</span>
+              </div>
+            </div>
+
+            <div class="monolith-actions">
+              <button class="action-trigger primary-trigger" data-goto-chamber="1">
+                <span>INSPECT SHIPPED ROMS</span>
+                <span class="trigger-arrow">→</span>
+              </button>
+              <button class="action-trigger secondary-trigger" data-goto-chamber="5">
+                <span>COMMISSION A FEVER DREAM</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Right Live Vibe-to-Reality Sequencer & AST Transducer -->
+          <div class="transducer-plate chamfer-plate">
+            <div class="plate-header">
+              <span class="plate-tag">LIVE VIBE COMPILER // v4.9</span>
+              <span class="live-indicator"><i class="pulse-dot"></i> TRANSDUCING</span>
+            </div>
+
+            <label class="transducer-label" for="vibe-prompt-input">
+              FEED RAW INTUITION / MOOD / CONTRADICTION INTO THE COMPILER:
+            </label>
+
+            <div class="prompt-input-wrap">
+              <textarea id="vibe-prompt-input" rows="2" spellcheck="false">A high-frequency DeFi liquidity terminal that feels like a rain-slicked 1997 Shibuya CRT ATM with heavy mechanical solenoid keys and phosphor amber telemetry.</textarea>
+              <button id="compile-vibe-btn" class="compile-vibe-btn" type="button">TRANSMUTE  ⚡</button>
+            </div>
+
+            <div class="preset-pills-row">
+              <span class="preset-caption">INJECT PRESET VECTOR:</span>
+              <div class="preset-pills" id="vibe-preset-buttons">
+                <!-- Populated dynamically from VIBE_PRESETS -->
+              </div>
+            </div>
+
+            <!-- Live Compiled Artifact Telemetry Output -->
+            <div class="compiler-output-box" id="compiler-output-box">
+              <div class="compiler-ast-row">
+                <span class="ast-label">EXTRACTED EMOTIONAL PRIMITIVES:</span>
+                <div class="ast-tokens" id="compiler-tokens"></div>
+              </div>
+
+              <div class="compiler-grid">
+                <div class="c-cell">
+                  <span class="c-key">SYNTHESIZED ARCHETYPE</span>
+                  <strong class="c-val" id="comp-archetype">TACTILE FINANCIAL INSTRUMENT</strong>
+                </div>
+                <div class="c-cell">
+                  <span class="c-key">EST. FOUNDRY VELOCITY</span>
+                  <strong class="c-val accent-volt" id="comp-time">64 HOURS</strong>
+                </div>
+                <div class="c-cell">
+                  <span class="c-key">OPTICAL SHADER PIPELINE</span>
+                  <span class="c-val" id="comp-shader">Sub-pixel Scanline Refraction + Halftone Bloom</span>
+                </div>
+                <div class="c-cell">
+                  <span class="c-key">INTERACTION PHYSICS</span>
+                  <span class="c-val" id="comp-interaction">Zero-modal mechanical latch triggers with 18ms acoustic feedback</span>
+                </div>
+              </div>
+
+              <!-- Mini Live Synthesized Artifact Preview Bar -->
+              <div class="live-specimen-micro" id="live-specimen-micro">
+                <div class="micro-top">
+                  <span class="micro-title" id="micro-title">SHIBUYA // LIQUIDITY DECK v0.9</span>
+                  <span class="micro-status" id="micro-status">SOLENOID LOCK ENGAGED</span>
+                </div>
+                <div class="micro-wave-row">
+                  <div class="micro-metric" id="micro-metric">¥ 482,910,400 // SPREAD 0.002%</div>
+                  <div class="micro-bars" aria-hidden="true">
+                    <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- -------------------------------------------------------------------
+           CHAMBER 01: SPECIMEN VAULT (THE ROM CARTRIDGE RACK)
+           ------------------------------------------------------------------- -->
+      <section class="chamber" id="chamber-1" data-chamber="1" aria-label="Chamber 01: Specimen Cartridge Vault">
+        <div class="ch1-layout">
+          <!-- Left: Physical Slotted ROM Cartridge Rack -->
+          <div class="cartridge-rack chamfer-plate">
+            <div class="plate-header">
+              <span class="plate-tag">ARCHIVE // ROM RACK 01–05</span>
+              <span class="plate-coord">CLICK CARTRIDGE TO MOUNT</span>
+            </div>
+            <h2 class="chamber-title">SHIPPED <span class="serif-italic">Hallucinations</span></h2>
+            <p class="chamber-desc">
+              Every artifact below was conceived, shader-sculpted, hardened, and deployed to production in under 96 hours. Slot a ROM cartridge to inspect its blueprint and morph the 3D core.
+            </p>
+
+            <div class="cartridge-list" id="cartridge-list" role="listbox" aria-label="Shipped Project Cartridges">
+              <!-- Populated from SPECIMENS -->
+            </div>
+          </div>
+
+          <!-- Right: Active Cartridge Dissection Deck -->
+          <div class="specimen-deck chamfer-plate" id="specimen-deck">
+            <div class="plate-header">
+              <span class="plate-tag" id="spec-slot-tag">MOUNTED // ROM 01</span>
+              <span class="spec-badge" id="spec-hours-badge">BUILT IN 62 HRS</span>
+            </div>
+
+            <div class="spec-header-block">
+              <div>
+                <span class="spec-cat" id="spec-category">GENERATIVE SPATIAL RADIO &amp; FOCUS OS</span>
+                <h3 class="spec-title" id="spec-title">VESPERS.FM</h3>
+              </div>
+              <div class="spec-taste-meter">
+                <span class="taste-label">TASTE CONVERGENCE</span>
+                <strong class="taste-val" id="spec-taste">99.4%</strong>
+              </div>
+            </div>
+
+            <div class="spec-prompt-callout">
+              <span class="callout-kicker">THE INITIAL VIBE PROMPT (DAY 0, HOUR 01):</span>
+              <blockquote id="spec-prompt">
+                "Make an ambient focus radio that feels like tuning a shortwave receiver inside a brutalist monastery during a geomagnetic storm."
+              </blockquote>
+            </div>
+
+            <div class="spec-metrics-grid" id="spec-metrics-grid">
+              <!-- 4 Telemetry cells -->
+            </div>
+
+            <div class="spec-two-col">
+              <div class="spec-col">
+                <span class="spec-col-label">SYNTHESIZED ARCHITECTURE</span>
+                <p id="spec-arch">Procedural WebAudio DSP graph + 60fps GLSL magnetosphere visualizer + zero-latency multiplayer listening rooms.</p>
+              </div>
+              <div class="spec-col">
+                <span class="spec-col-label">REAL-WORLD VOLTAGE</span>
+                <p id="spec-impact">140,000+ monthly active listeners; 68-minute average session duration; featured on front page of Designer News &amp; HN.</p>
+              </div>
+            </div>
+
+            <div class="spec-footer-bar">
+              <span class="spec-stat-pill">HANDWRITTEN BOILERPLATE: <strong id="spec-lines">0 LINES</strong></span>
+              <span class="spec-stat-pill">VIBE MUTATION PASSES: <strong id="spec-iterations">384 PASSES</strong></span>
+              <button class="action-trigger primary-trigger compact-trigger" data-goto-chamber="5">
+                COMMISSION SIMILAR VELOCITY →
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- -------------------------------------------------------------------
+           CHAMBER 02: DEATH OF THE SEMICOLON (ENTROPY INCINERATOR)
+           ------------------------------------------------------------------- -->
+      <section class="chamber" id="chamber-2" data-chamber="2" aria-label="Chamber 02: Death of the Semicolon">
+        <div class="ch2-layout">
+          <div class="incinerator-top chamfer-plate">
+            <div class="plate-header">
+              <span class="plate-tag">PARADIGM COLLIDER // CH.02</span>
+              <span class="plate-coord">DRAG CROSSFADER OR VAPORIZE RITUALS</span>
+            </div>
+
+            <div class="crossfader-header">
+              <div>
+                <h2 class="chamber-title">DEATH OF THE <span class="serif-italic">Semicolon</span></h2>
+                <p class="chamber-desc">
+                  Legacy software teams spend 88% of their caloric energy on coordination rituals and syntax plumbing. Slide the Reality Crossfader or click a legacy ritual below to incinerate it into pure shipping velocity.
+                </p>
+              </div>
+
+              <div class="incinerator-scoreboard">
+                <div class="score-cell">
+                  <span class="score-label">VAPORIZED BLOAT</span>
+                  <strong class="score-val accent-vermilion" id="hours-saved-val">0 HRS</strong>
+                </div>
+                <div class="score-cell">
+                  <span class="score-label">VELOCITY MULTIPLIER</span>
+                  <strong class="score-val accent-volt" id="velocity-mult-val">14.2x</strong>
+                </div>
+              </div>
+            </div>
+
+            <!-- Heavy Mechanical Reality Crossfader -->
+            <div class="crossfader-bay">
+              <div class="cf-pole cf-left">
+                <span class="pole-tag">ERA 01 // 1972–2024</span>
+                <strong>IMPERATIVE SUFFERING</strong>
+                <small>16-Week Roadmaps · Sprint Ceremonies · Bikeshedding</small>
+              </div>
+
+              <div class="cf-slider-wrap">
+                <input type="range" id="reality-crossfader" min="0" max="100" value="84" aria-label="Reality Crossfader between Imperative Suffering and Direct Intent Transmutation" />
+                <div class="cf-track-ticks" aria-hidden="true">
+                  <span>0%</span><span>25%</span><span>50%</span><span>75%</span><span>100% VIBE</span>
+                </div>
+              </div>
+
+              <div class="cf-pole cf-right">
+                <span class="pole-tag">ERA 02 // KOMA//99</span>
+                <strong>DIRECT INTENT TRANSMUTATION</strong>
+                <small>72-Hour Loops · Live Shaders · Zero-Syntax Swarm</small>
+              </div>
+            </div>
+          </div>
+
+          <!-- Interactive Legacy Ritual Incinerator Grid -->
+          <div class="ritual-grid-wrap">
+            <div class="ritual-bar-header">
+              <span class="ritual-instruction">CLICK ANY LEGACY ENGINEERING RITUAL BELOW TO VAPORIZE IT IN THE 3D COLLIDER:</span>
+              <button id="restore-rituals-btn" class="mini-util-btn" type="button">RESET RITUALS ↺</button>
+            </div>
+            <div class="ritual-grid" id="ritual-grid">
+              <!-- Populated from LEGACY_RITUALS -->
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- -------------------------------------------------------------------
+           CHAMBER 03: THE TASTE ENGINE (EXPLODED 4-STRATUM ARCHITECTURE)
+           ------------------------------------------------------------------- -->
+      <section class="chamber" id="chamber-3" data-chamber="3" aria-label="Chamber 03: The Taste Engine">
+        <div class="ch3-layout">
+          <div class="ch3-header-banner chamfer-plate">
+            <span class="plate-tag">EXPLODED AXONOMETRIC CORE // LIVE 3D NODE TETHERING</span>
+            <h2 class="chamber-title">WHY RAW AI OUTPUT LOOKS <span class="serif-italic">Generic</span> — AND HOW WE FIX IT.</h2>
+          </div>
+
+          <!-- 4 Perimeter-Docked Stratum Callout Plates tethered to the 3D scene -->
+          <div class="strata-cards-matrix" id="strata-cards-matrix">
+            <!-- Populated from STACK_STRATA with live 3D leader line anchors -->
+          </div>
+        </div>
+      </section>
+
+      <!-- -------------------------------------------------------------------
+           CHAMBER 04: SEVEN LAWS OF FEELING (KINETIC TYPOGRAPHY MATRIX)
+           ------------------------------------------------------------------- -->
+      <section class="chamber" id="chamber-4" data-chamber="4" aria-label="Chamber 04: Seven Laws of Feeling">
+        <div class="ch4-layout">
+          <div class="manifesto-intro chamfer-plate">
+            <span class="plate-tag">CODEX // K99 DOCTRINE</span>
+            <h2 class="chamber-title">THE SEVEN LAWS OF <span class="serif-italic">Post-Syntax</span> ARCHITECTURE</h2>
+            <p class="chamber-desc"> Sweep your cursor across the tension beams to modulate typographic shear and harmonic resonance. </p>
+          </div>
+
+          <div class="laws-kinetic-wall" id="laws-kinetic-wall">
+            <!-- Populated from MANIFESTO_LAWS -->
+          </div>
+        </div>
+      </section>
+
+      <!-- -------------------------------------------------------------------
+           CHAMBER 05: COMMISSION A FEVER DREAM (MISSION CONFIGURATOR & RECEIPT)
+           ------------------------------------------------------------------- -->
+      <section class="chamber" id="chamber-5" data-chamber="5" aria-label="Chamber 05: Commission a Fever Dream">
+        <div class="ch5-layout">
+          <!-- Left: Tactile Mission Switchboard -->
+          <div class="mission-switchboard chamfer-plate">
+            <div class="plate-header">
+              <span class="plate-tag">TRANSMISSION TERMINAL // CH.05</span>
+              <span class="plate-coord">DIRECT FOUNDRY UPLINK</span>
+            </div>
+
+            <h2 class="chamber-title">COMMISSION A <span class="serif-italic">Fever Dream</span></h2>
+            <p class="chamber-desc">
+              No sales decks. No 6-month discovery retainers. Configure your distortion parameters below to print a live foundry blueprint and lock a 72-hour build slot.
+            </p>
+
+            <!-- Control Group 1: Reality Distortion Level -->
+            <div class="config-group">
+              <span class="config-label">01 // SELECT REALITY DISTORTION LEVEL:</span>
+              <div class="switch-row" id="cfg-distortion">
+                <button type="button" class="dip-switch" data-val="UNCANNY POLISH" data-hours="48" data-rate="18000">
+                  <span class="sw-code">LVL.01</span>
+                  <strong class="sw-name">UNCANNY POLISH</strong>
+                  <small class="sw-sub">High-craft WebGL &amp; tactile UI</small>
+                </button>
+                <button type="button" class="dip-switch is-on" data-val="CATEGORY KILLER" data-hours="72" data-rate="32000">
+                  <span class="sw-code">LVL.02</span>
+                  <strong class="sw-name">CATEGORY KILLER</strong>
+                  <small class="sw-sub">Full product + custom shaders + synth</small>
+                </button>
+                <button type="button" class="dip-switch" data-val="UNIDENTIFIED ARTIFACT" data-hours="96" data-rate="54000">
+                  <span class="sw-code">LVL.03</span>
+                  <strong class="sw-name">ALIEN ARTIFACT</strong>
+                  <small class="sw-sub">Zero-precedent spatial OS + swarm</small>
+                </button>
+              </div>
+            </div>
+
+            <!-- Control Group 2: Sensory Modules (Multi-toggle) -->
+            <div class="config-group">
+              <span class="config-label">02 // ENGAGE SENSORY &amp; TECHNICAL SUBSYSTEMS:</span>
+              <div class="toggle-pills-row" id="cfg-modules">
+                <button type="button" class="mod-toggle is-on" data-mod="CUSTOM GLSL SHADERS">+ CUSTOM GLSL SHADERS</button>
+                <button type="button" class="mod-toggle is-on" data-mod="WEBAUDIO PSYCHOACOUSTICS">+ WEBAUDIO PSYCHOACOUSTICS</button>
+                <button type="button" class="mod-toggle is-on" data-mod="AGENTIC SWARM BACKEND">+ AGENTIC SWARM BACKEND</button>
+                <button type="button" class="mod-toggle" data-mod="MULTIPLAYER CRDT STATE">+ MULTIPLAYER CRDT STATE</button>
+                <button type="button" class="mod-toggle" data-mod="HARDWARE / MIDI BRIDGE">+ HARDWARE / MIDI BRIDGE</button>
+              </div>
+            </div>
+
+            <!-- Control Group 3: Prompt & Signal Address -->
+            <div class="config-group">
+              <span class="config-label">03 // DESCRIBE THE VIBE &amp; YOUR TRANSMISSION COORDINATES:</span>
+              <div class="dispatch-inputs">
+                <input type="text" id="cfg-vibe-text" placeholder="e.g. An AI video editor that feels like a 1974 Nagra tape deck..." value="An institutional trading deck that feels like a Buchla synthesizer inside a monastery." />
+                <input type="email" id="cfg-email" placeholder="founder@domain.xyz (Signal Return Address)" value="architect@protocol.xyz" />
+              </div>
+            </div>
+          </div>
+
+          <!-- Right: Serrated Thermal Blueprint Receipt & Stamp Button -->
+          <div class="thermal-receipt-wrap">
+            <div class="thermal-receipt" id="thermal-receipt">
+              <div class="serrated-edge-top" aria-hidden="true"></div>
+
+              <div class="receipt-inner">
+                <div class="receipt-head">
+                  <span class="r-logo">KOMA//99 FOUNDRY SPEC</span>
+                  <span class="r-hash" id="receipt-hash">HASH: 0x99F4..A81C</span>
+                </div>
+
+                <div class="receipt-divider">----------------------------------------</div>
+
+                <div class="receipt-line">
+                  <span>DISTORTION CLASS:</span>
+                  <strong id="r-distortion">CATEGORY KILLER</strong>
+                </div>
+                <div class="receipt-line">
+                  <span>EST. TURNAROUND:</span>
+                  <strong id="r-hours">72 HOURS (3 DAYS)</strong>
+                </div>
+                <div class="receipt-line">
+                  <span>HANDWRITTEN BOILERPLATE:</span>
+                  <strong>0 LINES (100% SYNTH)</strong>
+                </div>
+                <div class="receipt-line">
+                  <span>HUMAN TASTE LOCK:</span>
+                  <strong>3 PRINCIPAL ARCHITECTS</strong>
+                </div>
+
+                <div class="receipt-divider">----------------------------------------</div>
+
+                <div class="receipt-modules">
+                  <span class="r-subhead">ENGAGED SUBSYSTEMS:</span>
+                  <ul id="r-modules-list"></ul>
+                </div>
+
+                <div class="receipt-prompt-box">
+                  <span class="r-subhead">ENCODED VIBE SEED:</span>
+                  <p id="r-vibe-preview">"An institutional trading deck that feels like a Buchla synthesizer inside a monastery."</p>
+                </div>
+
+                <div class="receipt-divider">========================================</div>
+
+                <div class="receipt-total-row">
+                  <span>FOUNDRY ALLOCATION:</span>
+                  <strong class="r-price" id="r-price">$32,000 USD</strong>
+                </div>
+
+                <button id="transmit-stamp-btn" class="transmit-stamp-btn" type="button">
+                  <span>STAMP &amp; TRANSMIT SIGNAL</span>
+                  <span class="stamp-icon">▣</span>
+                </button>
+
+                <div id="stamp-confirmation" class="stamp-confirmation" aria-live="polite">
+                  SIGNAL LOCKED // SLOT #K99-804 RESERVED
+                </div>
+              </div>
+
+              <div class="serrated-edge-bottom" aria-hidden="true"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- RIGHT RAIL: ROTARY SHADER SYNTH KNOBS & VERLET ROPE PATCH-BAY -->
+    <aside class="rail-right" aria-label="Live Vibe Parameters &amp; Patch Bay">
+      <div class="synth-panel">
+        <div class="panel-title-row">
+          <span class="panel-title">FIELD MODULATORS</span>
+          <span class="panel-badge">DRAG KNOBS</span>
+        </div>
+
+        <div class="knobs-rack">
+          <!-- Rotary Knob 1: Temperature -->
+          <div class="knob-unit" data-knob="temperature" data-min="0" data-max="100" data-val="78" role="slider" tabindex="0" aria-label="Temperature parameter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="78">
+            <div class="knob-dial">
+              <div class="knob-indicator" id="knob-ind-temperature"></div>
+            </div>
+            <div class="knob-meta">
+              <span class="knob-name">TEMP (K)</span>
+              <span class="knob-val" id="knob-val-temperature">078</span>
+            </div>
+          </div>
+
+          <!-- Rotary Knob 2: Density -->
+          <div class="knob-unit" data-knob="density" data-min="0" data-max="100" data-val="84" role="slider" tabindex="0" aria-label="Density parameter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="84">
+            <div class="knob-dial">
+              <div class="knob-indicator" id="knob-ind-density"></div>
+            </div>
+            <div class="knob-meta">
+              <span class="knob-name">DENS (Hz)</span>
+              <span class="knob-val" id="knob-val-density">084</span>
+            </div>
+          </div>
+
+          <!-- Rotary Knob 3: Entropy -->
+          <div class="knob-unit" data-knob="entropy" data-min="0" data-max="100" data-val="42" role="slider" tabindex="0" aria-label="Entropy parameter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="42">
+            <div class="knob-dial">
+              <div class="knob-indicator" id="knob-ind-entropy"></div>
+            </div>
+            <div class="knob-meta">
+              <span class="knob-name">ENTR (Δ)</span>
+              <span class="knob-val" id="knob-val-entropy">042</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modular Patch-Bay Matrix -->
+      <div class="patchbay-panel">
+        <div class="panel-title-row">
+          <span class="panel-title">PATCH MATRIX</span>
+          <button id="randomize-patch-btn" class="patch-mutate-btn" type="button" title="Randomize Patch Cables">RE-PATCH ⚡</button>
+        </div>
+        <p class="patch-hint">Drag plugs or click sockets to re-route hanging cables:</p>
+
+        <div class="patch-jacks-columns">
+          <div class="jack-col">
+            <span class="jack-col-title">INTENT OUT</span>
+            <button type="button" class="jack-socket" data-jack-type="out" data-jack-id="0">
+              <span class="jack-ring"></span>
+              <span class="jack-label">OUT.1 EUPHORIA</span>
+            </button>
+            <button type="button" class="jack-socket" data-jack-type="out" data-jack-id="1">
+              <span class="jack-ring"></span>
+              <span class="jack-label">OUT.2 BRUTAL</span>
+            </button>
+            <button type="button" class="jack-socket" data-jack-type="out" data-jack-id="2">
+              <span class="jack-ring"></span>
+              <span class="jack-label">OUT.3 LIQUID</span>
+            </button>
+            <button type="button" class="jack-socket" data-jack-type="out" data-jack-id="3">
+              <span class="jack-ring"></span>
+              <span class="jack-label">OUT.4 CHAOS</span>
+            </button>
+          </div>
+
+          <div class="jack-col">
+            <span class="jack-col-title">BUS IN</span>
+            <button type="button" class="jack-socket" data-jack-type="in" data-jack-id="0">
+              <span class="jack-ring"></span>
+              <span class="jack-label">IN.A SHADER</span>
+            </button>
+            <button type="button" class="jack-socket" data-jack-type="in" data-jack-id="1">
+              <span class="jack-ring"></span>
+              <span class="jack-label">IN.B OPTICS</span>
+            </button>
+            <button type="button" class="jack-socket" data-jack-type="in" data-jack-id="2">
+              <span class="jack-ring"></span>
+              <span class="jack-label">IN.C SKEW</span>
+            </button>
+            <button type="button" class="jack-socket" data-jack-type="in" data-jack-id="3">
+              <span class="jack-ring"></span>
+              <span class="jack-label">IN.D PULSE</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- BOTTOM RAIL: LIVE SIGNAL TICKER & QUICK CHAMBER PROGRESS -->
+    <footer class="rail-bottom">
+      <div class="bottom-status-left">
+        <span class="status-pill"><i class="pulse-dot"></i> GPU KERNEL LOCKED</span>
+        <span class="status-coord" id="node-telemetry-readout">3D NODES: [N0: +0.00, +1.15] [N1: +1.05, +0.35]</span>
+      </div>
+
+      <div class="bottom-ticker-wrap" aria-hidden="true">
+        <div class="bottom-ticker">
+          <span>NO HERO TEMPLATES // NO 3-CARD SAAS GRIDS // NO SCROLL-REVEAL CLICHÉS // DIRECT INTENT-TO-SILICON TRANSMUTATION // SHIPPED IN &lt; 96 HOURS //</span>
+          <span>NO HERO TEMPLATES // NO 3-CARD SAAS GRIDS // NO SCROLL-REVEAL CLICHÉS // DIRECT INTENT-TO-SILICON TRANSMUTATION // SHIPPED IN &lt; 96 HOURS //</span>
+        </div>
+      </div>
+
+      <div class="bottom-chamber-dots" id="bottom-chamber-dots">
+        <span class="key-hint">KEYS [1–6] OR WHEEL TO ORBIT</span>
+      </div>
+    </footer>
+
+  </div>
+
+  <!-- Verlet Physics Hanging Patch Cables SVG Layer (Above UI for Physical Depth) -->
+  <svg id="patchbay-cables-svg" class="patchbay-cables-svg" aria-hidden="true"></svg>
+
+</body>
+</html>

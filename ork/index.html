@@ -1,0 +1,1229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Orc Warrior — 3D Procedural Three.js</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+    }
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: radial-gradient(circle at 50% 35%, #282832 0%, #1a1a1f 60%, #0d0d11 100%);
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      color: #f3efe6;
+    }
+    #canvas-container {
+      width: 100%;
+      height: 100%;
+      position: relative;
+    }
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+    #hud {
+      position: fixed;
+      top: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      text-align: center;
+      pointer-events: none;
+      z-index: 10;
+    }
+    #hud h1 {
+      font-size: 1.65rem;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #f5e6c8;
+      text-shadow: 0 2px 12px rgba(0, 0, 0, 0.85), 0 0 24px rgba(220, 60, 30, 0.45);
+      margin-bottom: 6px;
+    }
+    #hud p {
+      font-size: 0.88rem;
+      letter-spacing: 0.06em;
+      color: #b5b2a8;
+      background: rgba(15, 15, 20, 0.65);
+      padding: 5px 14px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      display: inline-block;
+      backdrop-filter: blur(4px);
+    }
+    #ui-bottom {
+      position: fixed;
+      bottom: 36px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+    }
+    #attackBtn {
+      pointer-events: auto;
+      cursor: pointer;
+      padding: 14px 42px;
+      font-size: 1.2rem;
+      font-weight: 800;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #fff6e8;
+      background: linear-gradient(180deg, #b8291e 0%, #7d150e 60%, #590c07 100%);
+      border: 2px solid #e35d44;
+      border-radius: 999px;
+      box-shadow: 0 6px 22px rgba(184, 41, 30, 0.55), inset 0 1px 2px rgba(255, 220, 200, 0.4);
+      transition: transform 0.12s ease, box-shadow 0.2s ease, background 0.2s ease, filter 0.2s ease;
+    }
+    #attackBtn:hover {
+      transform: translateY(-2px) scale(1.04);
+      box-shadow: 0 0 28px rgba(255, 80, 50, 0.85), 0 8px 26px rgba(0, 0, 0, 0.7), inset 0 1px 3px rgba(255, 235, 220, 0.65);
+      filter: brightness(1.1);
+    }
+    #attackBtn:active, #attackBtn.attacking {
+      transform: translateY(2px) scale(0.97);
+      box-shadow: 0 0 16px rgba(255, 60, 30, 0.7), 0 2px 10px rgba(0, 0, 0, 0.8);
+    }
+    #flashOverlay {
+      position: fixed;
+      inset: 0;
+      background: radial-gradient(circle, rgba(255, 240, 215, 0.85) 0%, rgba(255, 110, 40, 0.35) 60%, transparent 100%);
+      opacity: 0;
+      pointer-events: none;
+      z-index: 8;
+      transition: opacity 0.06s ease-out;
+    }
+  </style>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body>
+  <div id="flashOverlay"></div>
+  <div id="hud">
+    <h1>Orc Warrior — Click to Attack</h1>
+    <p>Drag to rotate &middot; Scroll to zoom &middot; Space / Click to strike</p>
+  </div>
+  <div id="ui-bottom">
+    <button id="attackBtn" type="button">Attack!</button>
+  </div>
+  <div id="canvas-container"></div>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+    // =========================================================================
+    // 1. SCENE, CAMERA & RENDERER SETUP
+    // =========================================================================
+    const container = document.getElementById('canvas-container');
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x1a1a1f);
+    scene.fog = new THREE.FogExp2(0x1a1a1f, 0.045);
+
+    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+    const baseCameraPos = new THREE.Vector3(3, 3, 6);
+    camera.position.copy(baseCameraPos);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.15;
+    container.appendChild(renderer.domElement);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.target.set(0, 1.2, 0);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.06;
+    controls.minDistance = 2.5;
+    controls.maxDistance = 14;
+    controls.maxPolarAngle = Math.PI / 2 - 0.03;
+    controls.update();
+
+    // Helper to enable shadows on meshes
+    function enableShadows(obj, cast = true, receive = true) {
+      obj.traverse((child) => {
+        if (child.isMesh) {
+          child.castShadow = cast;
+          child.receiveShadow = receive;
+        }
+      });
+    }
+
+    // =========================================================================
+    // 2. LIGHTING & ENVIRONMENT
+    // =========================================================================
+    let axeRimLight, heroLight;
+
+    function setupLights() {
+      // Ambient hemisphere fill
+      const hemiLight = new THREE.HemisphereLight(0x8fa8c8, 0x2a3324, 0.75);
+      hemiLight.position.set(0, 10, 0);
+      scene.add(hemiLight);
+
+      // Warm directional key light from upper-left casting soft shadows
+      const dirLight = new THREE.DirectionalLight(0xffe2b8, 2.6);
+      dirLight.position.set(-5, 8, 5);
+      dirLight.castShadow = true;
+      dirLight.shadow.mapSize.set(2048, 2048);
+      dirLight.shadow.camera.near = 1;
+      dirLight.shadow.camera.far = 22;
+      const d = 4.5;
+      dirLight.shadow.camera.left = -d;
+      dirLight.shadow.camera.right = d;
+      dirLight.shadow.camera.top = d;
+      dirLight.shadow.camera.bottom = -d;
+      dirLight.shadow.bias = -0.0005;
+      scene.add(dirLight);
+
+      // Cool back-right rim light to make the silhouette pop
+      const backRim = new THREE.DirectionalLight(0x6b9cff, 1.35);
+      backRim.position.set(5, 5, -6);
+      scene.add(backRim);
+
+      // Menacing red/orange point light near the axe
+      axeRimLight = new THREE.PointLight(0xff4518, 2.2, 6, 1.6);
+      axeRimLight.position.set(-1.3, 1.8, 1.1);
+      scene.add(axeRimLight);
+
+      // Subtle orbiting hero light
+      heroLight = new THREE.PointLight(0xffae52, 0.9, 8);
+      heroLight.position.set(2.5, 3.2, 2.5);
+      scene.add(heroLight);
+
+      // Ground plane + arena stones
+      const groundMat = new THREE.MeshStandardMaterial({
+        color: 0x23291f,
+        roughness: 0.92,
+        metalness: 0.05
+      });
+      const ground = new THREE.Mesh(new THREE.CircleGeometry(14, 64), groundMat);
+      ground.rotation.x = -Math.PI / 2;
+      ground.receiveShadow = true;
+      scene.add(ground);
+
+      // Inner dirt ring under the orc
+      const innerRing = new THREE.Mesh(
+        new THREE.CircleGeometry(2.6, 48),
+        new THREE.MeshStandardMaterial({ color: 0x2c261e, roughness: 0.96, metalness: 0.04 })
+      );
+      innerRing.rotation.x = -Math.PI / 2;
+      innerRing.position.y = 0.005;
+      innerRing.receiveShadow = true;
+      scene.add(innerRing);
+
+      // Low-poly rocks around the perimeter
+      const rockMat = new THREE.MeshStandardMaterial({
+        color: 0x36383c,
+        roughness: 0.85,
+        metalness: 0.1,
+        flatShading: true
+      });
+      for (let i = 0; i < 12; i++) {
+        const angle = (i / 12) * Math.PI * 2 + (i % 2) * 0.18;
+        const radius = 3.2 + (i % 3) * 0.65;
+        const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(0.18 + (i % 4) * 0.07, 0), rockMat);
+        rock.position.set(Math.cos(angle) * radius, 0.08, Math.sin(angle) * radius);
+        rock.scale.set(1.2, 0.65, 1.0);
+        rock.rotation.set(i * 0.7, i * 1.3, 0);
+        rock.castShadow = true;
+        rock.receiveShadow = true;
+        scene.add(rock);
+      }
+    }
+
+    // =========================================================================
+    // 3. PROCEDURAL BATTLE AXE
+    // =========================================================================
+    let axeTipMarker, axeBladeMats = [];
+
+    function createAxe() {
+      const axeGroup = new THREE.Group();
+      axeGroup.name = 'battleAxe';
+
+      const woodMat = new THREE.MeshStandardMaterial({
+        color: 0x4b2e19,
+        roughness: 0.78,
+        metalness: 0.08
+      });
+      const leatherWrapMat = new THREE.MeshStandardMaterial({
+        color: 0x2a1810,
+        roughness: 0.85,
+        metalness: 0.05
+      });
+      const darkIronMat = new THREE.MeshStandardMaterial({
+        color: 0x3b3f46,
+        roughness: 0.42,
+        metalness: 0.82
+      });
+      const bladeMat = new THREE.MeshStandardMaterial({
+        color: 0x8a8f98,
+        roughness: 0.22,
+        metalness: 0.88,
+        emissive: 0x330800,
+        emissiveIntensity: 0.25
+      });
+      axeBladeMats.push(bladeMat);
+
+      // Handle (~1.45 units long)
+      const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.042, 0.05, 1.45, 12), woodMat);
+      handle.position.y = 0.38;
+      axeGroup.add(handle);
+
+      // Pommel at bottom of grip
+      const pommel = new THREE.Mesh(new THREE.DodecahedronGeometry(0.085, 0), darkIronMat);
+      pommel.position.y = -0.36;
+      axeGroup.add(pommel);
+
+      // Leather grip rings
+      for (let i = -3; i <= 3; i++) {
+        const ring = new THREE.Mesh(new THREE.TorusGeometry(0.048, 0.012, 8, 16), leatherWrapMat);
+        ring.rotation.x = Math.PI / 2 + 0.08;
+        ring.position.y = i * 0.055;
+        axeGroup.add(ring);
+      }
+
+      // Central socket block near top of handle
+      const socketY = 0.92;
+      const socket = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.28, 0.16), darkIronMat);
+      socket.position.y = socketY;
+      axeGroup.add(socket);
+
+      // Decorative brass/gold rivets on the socket
+      const brassMat = new THREE.MeshStandardMaterial({
+        color: 0xc89d42,
+        roughness: 0.35,
+        metalness: 0.85
+      });
+      for (const sx of [-0.07, 0.07]) {
+        for (const sy of [-0.07, 0.07]) {
+          const rivet = new THREE.Mesh(new THREE.SphereGeometry(0.02, 8, 8), brassMat);
+          rivet.position.set(sx, socketY + sy, 0.082);
+          axeGroup.add(rivet);
+          const rivetBack = rivet.clone();
+          rivetBack.position.z = -0.082;
+          axeGroup.add(rivetBack);
+        }
+      }
+
+      // Top spike above socket
+      const topSpike = new THREE.Mesh(new THREE.ConeGeometry(0.055, 0.26, 8), bladeMat);
+      topSpike.position.y = socketY + 0.26;
+      axeGroup.add(topSpike);
+
+      // Extruded crescent blade geometry
+      const bladeShape = new THREE.Shape();
+      bladeShape.moveTo(0.08, 0.09);
+      bladeShape.quadraticCurveTo(0.32, 0.15, 0.48, 0.32);
+      bladeShape.quadraticCurveTo(0.60, 0.0, 0.48, -0.34);
+      bladeShape.quadraticCurveTo(0.30, -0.16, 0.08, -0.09);
+      bladeShape.closePath();
+
+      const extrudeSettings = {
+        steps: 1,
+        depth: 0.026,
+        bevelEnabled: true,
+        bevelThickness: 0.022,
+        bevelSize: 0.035,
+        bevelSegments: 2
+      };
+      const bladeGeo = new THREE.ExtrudeGeometry(bladeShape, extrudeSettings);
+      bladeGeo.center();
+
+      // Front and back crescent blades
+      const rightBlade = new THREE.Mesh(bladeGeo, bladeMat);
+      rightBlade.position.set(0.30, socketY, 0);
+      axeGroup.add(rightBlade);
+
+      const leftBlade = new THREE.Mesh(bladeGeo, bladeMat);
+      leftBlade.rotation.y = Math.PI;
+      leftBlade.position.set(-0.30, socketY, 0);
+      axeGroup.add(leftBlade);
+
+      // Invisible marker at the front blade tip for impact particle spawn
+      axeTipMarker = new THREE.Object3D();
+      axeTipMarker.position.set(0.55, socketY, 0);
+      axeGroup.add(axeTipMarker);
+
+      // Rotate the axe inside the hand so the blade edge faces forward (+Z) when gripping
+      axeGroup.rotation.x = Math.PI / 2;
+      axeGroup.rotation.y = -Math.PI / 2;
+
+      enableShadows(axeGroup);
+      return axeGroup;
+    }
+
+    // =========================================================================
+    // 4. PROCEDURAL ORC CHARACTER (Hierarchical Rig)
+    // =========================================================================
+    const rig = {};
+
+    function createOrc() {
+      const orc = new THREE.Group();
+      orc.name = 'orc';
+
+      // Shared procedural materials
+      const skinMat = new THREE.MeshStandardMaterial({
+        color: 0x4a7c3a,
+        roughness: 0.68,
+        metalness: 0.06
+      });
+      const skinDarkMat = new THREE.MeshStandardMaterial({
+        color: 0x3b662d,
+        roughness: 0.72,
+        metalness: 0.06
+      });
+      const warPaintMat = new THREE.MeshStandardMaterial({
+        color: 0x9e1b14,
+        roughness: 0.6,
+        metalness: 0.1
+      });
+      const leatherMat = new THREE.MeshStandardMaterial({
+        color: 0x4a2f1d,
+        roughness: 0.82,
+        metalness: 0.08
+      });
+      const darkLeatherMat = new THREE.MeshStandardMaterial({
+        color: 0x2b1b11,
+        roughness: 0.88,
+        metalness: 0.05
+      });
+      const armorMat = new THREE.MeshStandardMaterial({
+        color: 0x525760,
+        roughness: 0.38,
+        metalness: 0.8
+      });
+      const boneMat = new THREE.MeshStandardMaterial({
+        color: 0xe6dec3,
+        roughness: 0.45,
+        metalness: 0.08
+      });
+      const hairMat = new THREE.MeshStandardMaterial({
+        color: 0x181616,
+        roughness: 0.9,
+        metalness: 0.05
+      });
+      const eyeWhiteMat = new THREE.MeshStandardMaterial({
+        color: 0xffefa8,
+        emissive: 0xff5500,
+        emissiveIntensity: 0.4,
+        roughness: 0.3
+      });
+      const pupilMat = new THREE.MeshStandardMaterial({
+        color: 0x140804,
+        roughness: 0.2
+      });
+      const goldMat = new THREE.MeshStandardMaterial({
+        color: 0xd4a238,
+        roughness: 0.32,
+        metalness: 0.85
+      });
+
+      // --- HIPS / PELVIS ---
+      const hipsGroup = new THREE.Group();
+      hipsGroup.position.set(0, 0.95, 0);
+      orc.add(hipsGroup);
+
+      const pelvis = new THREE.Mesh(new THREE.BoxGeometry(0.86, 0.36, 0.56), darkLeatherMat);
+      hipsGroup.add(pelvis);
+
+      // Heavy belt (Torus + central buckle + loincloth)
+      const belt = new THREE.Mesh(new THREE.TorusGeometry(0.47, 0.075, 10, 24), leatherMat);
+      belt.rotation.x = Math.PI / 2;
+      belt.scale.set(1.06, 0.76, 1.0);
+      belt.position.y = 0.14;
+      hipsGroup.add(belt);
+
+      const buckle = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 0.08, 8), goldMat);
+      buckle.rotation.x = Math.PI / 2;
+      buckle.position.set(0, 0.14, 0.31);
+      hipsGroup.add(buckle);
+
+      const buckleSkull = new THREE.Mesh(new THREE.SphereGeometry(0.075, 10, 10), boneMat);
+      buckleSkull.position.set(0, 0.14, 0.35);
+      hipsGroup.add(buckleSkull);
+
+      const loincloth = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.48, 0.05), warPaintMat);
+      loincloth.position.set(0, -0.18, 0.29);
+      loincloth.rotation.x = -0.08;
+      hipsGroup.add(loincloth);
+
+      // --- TORSO ---
+      const torsoGroup = new THREE.Group();
+      torsoGroup.name = 'torso';
+      torsoGroup.position.set(0, 0.18, 0);
+      hipsGroup.add(torsoGroup);
+
+      // Lower abdomen
+      const abdomen = new THREE.Mesh(new THREE.CylinderGeometry(0.54, 0.44, 0.52, 12), skinMat);
+      abdomen.scale.set(1.08, 1.0, 0.78);
+      abdomen.position.y = 0.24;
+      torsoGroup.add(abdomen);
+
+      // Broad heroic chest
+      const chest = new THREE.Mesh(new THREE.BoxGeometry(1.18, 0.66, 0.72), skinMat);
+      chest.position.set(0, 0.68, 0.02);
+      torsoGroup.add(chest);
+
+      // Sculpted pectoral plates
+      for (const side of [-1, 1]) {
+        const pec = new THREE.Mesh(new THREE.BoxGeometry(0.48, 0.28, 0.14), skinDarkMat);
+        pec.position.set(side * 0.26, 0.74, 0.34);
+        pec.rotation.z = side * -0.08;
+        torsoGroup.add(pec);
+      }
+
+      // Red war paint stripes across chest
+      for (const side of [-1, 1]) {
+        const stripe = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.06, 0.03), warPaintMat);
+        stripe.position.set(side * 0.28, 0.82, 0.405);
+        stripe.rotation.z = side * 0.25;
+        torsoGroup.add(stripe);
+      }
+
+      // Diagonal leather chest harness strap + medallion
+      const strap = new THREE.Mesh(new THREE.BoxGeometry(0.16, 1.15, 0.78), leatherMat);
+      strap.position.set(0, 0.62, 0.02);
+      strap.rotation.z = 0.62;
+      torsoGroup.add(strap);
+
+      const chestMedallion = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.13, 0.06, 10), armorMat);
+      chestMedallion.rotation.x = Math.PI / 2;
+      chestMedallion.position.set(0.05, 0.66, 0.40);
+      torsoGroup.add(chestMedallion);
+
+      // --- HEAD ---
+      const headGroup = new THREE.Group();
+      headGroup.name = 'head';
+      headGroup.position.set(0, 1.08, 0.06);
+      torsoGroup.add(headGroup);
+
+      // Neck
+      const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.26, 0.22, 10), skinDarkMat);
+      neck.position.y = 0.05;
+      headGroup.add(neck);
+
+      // Cranium
+      const cranium = new THREE.Mesh(new THREE.SphereGeometry(0.34, 16, 14), skinMat);
+      cranium.scale.set(0.96, 1.08, 1.02);
+      cranium.position.set(0, 0.30, 0);
+      headGroup.add(cranium);
+
+      // Heavy protruding lower jaw
+      const jaw = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.24, 0.42), skinDarkMat);
+      jaw.position.set(0, 0.14, 0.10);
+      headGroup.add(jaw);
+
+      // Snarling mouth cavity
+      const mouth = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.07, 0.12), darkLeatherMat);
+      mouth.position.set(0, 0.19, 0.28);
+      headGroup.add(mouth);
+
+      // Heavy furrowed brow ridge
+      const brow = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.11, 0.24), skinDarkMat);
+      brow.position.set(0, 0.39, 0.24);
+      brow.rotation.x = 0.18;
+      headGroup.add(brow);
+
+      // Broad nose
+      const nose = new THREE.Mesh(new THREE.ConeGeometry(0.085, 0.18, 6), skinDarkMat);
+      nose.position.set(0, 0.29, 0.34);
+      nose.rotation.x = Math.PI / 2 - 0.3;
+      headGroup.add(nose);
+
+      // Fierce eyes + pupils + war paint
+      for (const side of [-1, 1]) {
+        const eye = new THREE.Mesh(new THREE.SphereGeometry(0.052, 10, 10), eyeWhiteMat);
+        eye.position.set(side * 0.13, 0.33, 0.29);
+        headGroup.add(eye);
+
+        const pupil = new THREE.Mesh(new THREE.SphereGeometry(0.026, 8, 8), pupilMat);
+        pupil.position.set(side * 0.13, 0.33, 0.335);
+        headGroup.add(pupil);
+
+        // Eye war paint streak
+        const faceStripe = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.22, 0.04), warPaintMat);
+        faceStripe.position.set(side * 0.16, 0.26, 0.29);
+        faceStripe.rotation.z = side * -0.15;
+        headGroup.add(faceStripe);
+
+        // Upward-pointing lower tusks
+        const tusk = new THREE.Mesh(new THREE.ConeGeometry(0.048, 0.22, 8), boneMat);
+        tusk.position.set(side * 0.15, 0.23, 0.31);
+        tusk.rotation.x = 0.22;
+        tusk.rotation.z = side * -0.14;
+        headGroup.add(tusk);
+
+        // Smaller inner fangs
+        const fang = new THREE.Mesh(new THREE.ConeGeometry(0.025, 0.10, 6), boneMat);
+        fang.position.set(side * 0.07, 0.20, 0.31);
+        fang.rotation.x = 0.18;
+        headGroup.add(fang);
+
+        // Pointed orc ears + gold earring on left ear
+        const ear = new THREE.Mesh(new THREE.ConeGeometry(0.085, 0.32, 8), skinMat);
+        ear.position.set(side * 0.39, 0.32, -0.02);
+        ear.rotation.z = side * -1.22;
+        ear.rotation.y = side * -0.25;
+        headGroup.add(ear);
+
+        if (side === -1) {
+          const earring = new THREE.Mesh(new THREE.TorusGeometry(0.045, 0.012, 8, 12), goldMat);
+          earring.position.set(-0.44, 0.25, -0.02);
+          headGroup.add(earring);
+        }
+      }
+
+      // Topknot hair tie + plume
+      const hairTie = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.07, 0.08, 10), goldMat);
+      hairTie.position.set(0, 0.65, -0.05);
+      headGroup.add(hairTie);
+
+      const topknot = new THREE.Mesh(new THREE.ConeGeometry(0.14, 0.42, 10), hairMat);
+      topknot.position.set(0, 0.82, -0.14);
+      topknot.rotation.x = -0.55;
+      headGroup.add(topknot);
+
+      // --- ARMS (Left & Right with Shoulder, Elbow & Hand Pivots) ---
+      function buildArm(isRight) {
+        const side = isRight ? -1 : 1; // Right arm is on -X in character space (viewer's left)
+        const armGroup = new THREE.Group();
+        armGroup.name = isRight ? 'rightArmGroup' : 'leftArmGroup';
+        armGroup.position.set(side * 0.72, 0.88, 0.0);
+        torsoGroup.add(armGroup);
+
+        // Armored pauldron (half-sphere + spikes)
+        const pauldron = new THREE.Mesh(
+          new THREE.SphereGeometry(0.28, 14, 12, 0, Math.PI * 2, 0, Math.PI * 0.58),
+          armorMat
+        );
+        pauldron.position.set(side * 0.05, 0.05, 0);
+        pauldron.rotation.z = side * -0.35;
+        armGroup.add(pauldron);
+
+        for (let s = -1; s <= 1; s++) {
+          const spike = new THREE.Mesh(new THREE.ConeGeometry(0.042, 0.18, 6), boneMat);
+          spike.position.set(side * 0.18, 0.22, s * 0.11);
+          spike.rotation.z = side * -0.55;
+          spike.rotation.x = s * 0.35;
+          armGroup.add(spike);
+        }
+
+        // Deltoid / shoulder muscle
+        const deltoid = new THREE.Mesh(new THREE.SphereGeometry(0.21, 12, 10), skinMat);
+        armGroup.add(deltoid);
+
+        // Upper arm cylinder
+        const upperArm = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.145, 0.48, 12), skinMat);
+        upperArm.position.y = -0.24;
+        armGroup.add(upperArm);
+
+        // Forearm group (elbow pivot)
+        const forearmGroup = new THREE.Group();
+        forearmGroup.name = isRight ? 'rightForearmGroup' : 'leftForearmGroup';
+        forearmGroup.position.set(0, -0.48, 0);
+        armGroup.add(forearmGroup);
+
+        const elbow = new THREE.Mesh(new THREE.SphereGeometry(0.14, 10, 10), skinDarkMat);
+        forearmGroup.add(elbow);
+
+        // Thick muscular forearm
+        const forearm = new THREE.Mesh(new THREE.CylinderGeometry(0.155, 0.125, 0.46, 12), skinMat);
+        forearm.position.y = -0.23;
+        forearmGroup.add(forearm);
+
+        // Leather bracer + metal studs
+        const bracer = new THREE.Mesh(new THREE.CylinderGeometry(0.162, 0.135, 0.28, 12), leatherMat);
+        bracer.position.y = -0.26;
+        forearmGroup.add(bracer);
+
+        const bracerTrim = new THREE.Mesh(new THREE.TorusGeometry(0.155, 0.018, 8, 16), armorMat);
+        bracerTrim.rotation.x = Math.PI / 2;
+        bracerTrim.position.y = -0.13;
+        forearmGroup.add(bracerTrim);
+
+        // Hand group (wrist pivot)
+        const handGroup = new THREE.Group();
+        handGroup.name = isRight ? 'rightHandGroup' : 'leftHandGroup';
+        handGroup.position.set(0, -0.48, 0);
+        forearmGroup.add(handGroup);
+
+        // Oversized heroic fist
+        const fist = new THREE.Mesh(new THREE.BoxGeometry(0.21, 0.22, 0.22), skinDarkMat);
+        fist.position.y = -0.06;
+        handGroup.add(fist);
+
+        const knuckles = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.12, 0.10), skinMat);
+        knuckles.position.set(side * -0.04, -0.08, 0.11);
+        handGroup.add(knuckles);
+
+        return { armGroup, forearmGroup, handGroup };
+      }
+
+      const rightArm = buildArm(true);
+      const leftArm = buildArm(false);
+
+      // Attach battle axe to right hand group
+      const axe = createAxe();
+      axe.position.set(0, -0.08, 0.04);
+      rightArm.handGroup.add(axe);
+
+      // --- LEGS (Left & Right with Hip & Knee Pivots) ---
+      function buildLeg(isRight) {
+        const side = isRight ? -1 : 1;
+        const legGroup = new THREE.Group();
+        legGroup.position.set(side * 0.28, -0.10, 0);
+        hipsGroup.add(legGroup);
+
+        // Thigh
+        const thigh = new THREE.Mesh(new THREE.CylinderGeometry(0.21, 0.17, 0.46, 12), darkLeatherMat);
+        thigh.position.y = -0.22;
+        legGroup.add(thigh);
+
+        // Knee pivot
+        const kneeGroup = new THREE.Group();
+        kneeGroup.position.set(0, -0.44, 0);
+        legGroup.add(kneeGroup);
+
+        // Knee pad
+        const kneePad = new THREE.Mesh(new THREE.SphereGeometry(0.15, 10, 10), armorMat);
+        kneePad.position.set(0, 0.02, 0.06);
+        kneeGroup.add(kneePad);
+
+        // Shin
+        const shin = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.13, 0.42, 12), leatherMat);
+        shin.position.y = -0.20;
+        kneeGroup.add(shin);
+
+        // Heavy boot
+        const boot = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.20, 0.40), darkLeatherMat);
+        boot.position.set(0, -0.36, 0.07);
+        kneeGroup.add(boot);
+
+        const toeCap = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.14, 0.18, 10), armorMat);
+        toeCap.rotation.z = Math.PI / 2;
+        toeCap.position.set(0, -0.37, 0.22);
+        kneeGroup.add(toeCap);
+
+        return { legGroup, kneeGroup };
+      }
+
+      const rightLeg = buildLeg(true);
+      const leftLeg = buildLeg(false);
+
+      // Set heroic combat resting pose and store base rotations
+      rightArm.armGroup.rotation.set(-0.45, 0.10, -0.18);
+      rightArm.forearmGroup.rotation.set(-0.75, 0.12, 0.08);
+      rightArm.handGroup.rotation.set(-0.15, 0, 0);
+
+      leftArm.armGroup.rotation.set(0.18, -0.1, 0.26);
+      leftArm.forearmGroup.rotation.set(-0.52, -0.15, -0.08);
+
+      rightLeg.legGroup.rotation.set(0.08, -0.12, -0.05);
+      rightLeg.kneeGroup.rotation.set(0.10, 0, 0);
+      leftLeg.legGroup.rotation.set(-0.10, 0.14, 0.05);
+      leftLeg.kneeGroup.rotation.set(0.14, 0, 0);
+
+      rig.orc = orc;
+      rig.hips = hipsGroup;
+      rig.torso = torsoGroup;
+      rig.head = headGroup;
+      rig.rightArmGroup = rightArm.armGroup;
+      rig.rightForearmGroup = rightArm.forearmGroup;
+      rig.rightHandGroup = rightArm.handGroup;
+      rig.leftArmGroup = leftArm.armGroup;
+      rig.leftForearmGroup = leftArm.forearmGroup;
+      rig.rightLeg = rightLeg.legGroup;
+      rig.leftLeg = leftLeg.legGroup;
+
+      // Capture rest rotations for clean keyframe offsets
+      rig.rest = {
+        orcX: orc.rotation.x,
+        torsoX: torsoGroup.rotation.x,
+        torsoY: torsoGroup.rotation.y,
+        headX: headGroup.rotation.x,
+        headY: headGroup.rotation.y,
+        rightArmX: rightArm.armGroup.rotation.x,
+        rightArmY: rightArm.armGroup.rotation.y,
+        rightArmZ: rightArm.armGroup.rotation.z,
+        rightForearmX: rightArm.forearmGroup.rotation.x,
+        rightHandX: rightArm.handGroup.rotation.x,
+        leftArmX: leftArm.armGroup.rotation.x,
+        leftArmZ: leftArm.armGroup.rotation.z,
+        rightLegX: rightLeg.legGroup.rotation.x,
+        rightLegZ: rightLeg.legGroup.rotation.z
+      };
+
+      enableShadows(orc);
+      scene.add(orc);
+      return orc;
+    }
+
+    // =========================================================================
+    // 5. WEB AUDIO SYNTHESIS & IMPACT EFFECTS (Particles + Ring + Flash)
+    // =========================================================================
+    let audioCtx = null;
+
+    function ensureAudioContext() {
+      if (!audioCtx) {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (AudioContextClass) audioCtx = new AudioContextClass();
+      }
+      if (audioCtx && audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+    }
+
+    function playWhooshSound() {
+      ensureAudioContext();
+      if (!audioCtx) return;
+
+      const now = audioCtx.currentTime;
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(140, now);
+      osc.frequency.exponentialRampToValueAtTime(65, now + 0.26);
+
+      gain.gain.setValueAtTime(0.001, now);
+      gain.gain.linearRampToValueAtTime(0.14, now + 0.08);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.28);
+
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start(now);
+      osc.stop(now + 0.29);
+    }
+
+    function playImpactSound() {
+      ensureAudioContext();
+      if (!audioCtx) return;
+
+      const now = audioCtx.currentTime;
+
+      // Low sub-bass thud oscillator
+      const osc = audioCtx.createOscillator();
+      const oscGain = audioCtx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(125, now);
+      osc.frequency.exponentialRampToValueAtTime(28, now + 0.34);
+
+      oscGain.gain.setValueAtTime(0.55, now);
+      oscGain.gain.exponentialRampToValueAtTime(0.001, now + 0.36);
+
+      osc.connect(oscGain);
+      oscGain.connect(audioCtx.destination);
+      osc.start(now);
+      osc.stop(now + 0.38);
+
+      // Crunchy mid punch
+      const crunchOsc = audioCtx.createOscillator();
+      const crunchGain = audioCtx.createGain();
+      crunchOsc.type = 'sawtooth';
+      crunchOsc.frequency.setValueAtTime(85, now);
+      crunchOsc.frequency.exponentialRampToValueAtTime(22, now + 0.16);
+
+      crunchGain.gain.setValueAtTime(0.28, now);
+      crunchGain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+
+      crunchOsc.connect(crunchGain);
+      crunchGain.connect(audioCtx.destination);
+      crunchOsc.start(now);
+      crunchOsc.stop(now + 0.2);
+    }
+
+    const activeEffects = [];
+
+    function spawnImpactEffect() {
+      // Compute world position of the axe blade tip, clamped near ground level
+      const impactPos = new THREE.Vector3();
+      if (axeTipMarker) {
+        axeTipMarker.getWorldPosition(impactPos);
+      } else {
+        impactPos.set(-0.5, 0.2, 1.35);
+      }
+      impactPos.y = Math.max(0.05, Math.min(impactPos.y, 0.45));
+
+      // 1. Burst of glowing particles (THREE.Points + BufferGeometry)
+      const count = 48;
+      const positions = new Float32Array(count * 3);
+      const colors = new Float32Array(count * 3);
+      const velocities = [];
+
+      const c1 = new THREE.Color(0xffd269);
+      const c2 = new THREE.Color(0xff4e18);
+
+      for (let i = 0; i < count; i++) {
+        positions[i * 3] = impactPos.x + (Math.random() - 0.5) * 0.15;
+        positions[i * 3 + 1] = impactPos.y + Math.random() * 0.1;
+        positions[i * 3 + 2] = impactPos.z + (Math.random() - 0.5) * 0.15;
+
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 1.6 + Math.random() * 3.8;
+        velocities.push(
+          new THREE.Vector3(
+            Math.cos(angle) * speed,
+            1.8 + Math.random() * 3.6,
+            Math.sin(angle) * speed
+          )
+        );
+
+        const col = c1.clone().lerp(c2, Math.random());
+        colors[i * 3] = col.r;
+        colors[i * 3 + 1] = col.g;
+        colors[i * 3 + 2] = col.b;
+      }
+
+      const partGeo = new THREE.BufferGeometry();
+      partGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      partGeo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+      const partMat = new THREE.PointsMaterial({
+        size: 0.13,
+        vertexColors: true,
+        transparent: true,
+        opacity: 1.0,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false
+      });
+
+      const points = new THREE.Points(partGeo, partMat);
+      scene.add(points);
+
+      // 2. Expanding shockwave ring on the ground
+      const ringGeo = new THREE.RingGeometry(0.14, 0.30, 32);
+      const ringMat = new THREE.MeshBasicMaterial({
+        color: 0xff7b29,
+        side: THREE.DoubleSide,
+        transparent: true,
+        opacity: 0.92,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false
+      });
+      const ring = new THREE.Mesh(ringGeo, ringMat);
+      ring.rotation.x = -Math.PI / 2;
+      ring.position.set(impactPos.x, 0.02, impactPos.z);
+      scene.add(ring);
+
+      activeEffects.push({
+        points,
+        velocities,
+        ring,
+        age: 0,
+        duration: 0.52
+      });
+
+      // 3. Subtle screen flash overlay
+      const flashEl = document.getElementById('flashOverlay');
+      if (flashEl) {
+        flashEl.style.opacity = '0.38';
+        setTimeout(() => {
+          flashEl.style.opacity = '0';
+        }, 75);
+      }
+    }
+
+    function updateImpactEffects(dt) {
+      for (let i = activeEffects.length - 1; i >= 0; i--) {
+        const fx = activeEffects[i];
+        fx.age += dt;
+        const p = Math.min(fx.age / fx.duration, 1);
+
+        // Update particle positions & gravity
+        const posAttr = fx.points.geometry.attributes.position;
+        for (let j = 0; j < fx.velocities.length; j++) {
+          const v = fx.velocities[j];
+          v.y -= 9.8 * dt;
+          let ny = posAttr.getY(j) + v.y * dt;
+          if (ny < 0.03) {
+            ny = 0.03;
+            v.y *= -0.35;
+          }
+          posAttr.setXYZ(
+            j,
+            posAttr.getX(j) + v.x * dt,
+            ny,
+            posAttr.getZ(j) + v.z * dt
+          );
+        }
+        posAttr.needsUpdate = true;
+        fx.points.material.opacity = 1 - p * p;
+
+        // Expand and fade shockwave ring
+        const scale = 1 + p * 6.2;
+        fx.ring.scale.set(scale, scale, 1);
+        fx.ring.material.opacity = (1 - p) * 0.9;
+
+        if (fx.age >= fx.duration) {
+          scene.remove(fx.points);
+          scene.remove(fx.ring);
+          fx.points.geometry.dispose();
+          fx.points.material.dispose();
+          fx.ring.geometry.dispose();
+          fx.ring.material.dispose();
+          activeEffects.splice(i, 1);
+        }
+      }
+    }
+
+    // =========================================================================
+    // 6. ATTACK TIMELINE, EASING & IDLE ANIMATION
+    // =========================================================================
+    let isAttacking = false;
+    let attackElapsed = 0;
+    let impactTriggered = false;
+    let shakeRemaining = 0;
+    const shakeOffset = new THREE.Vector3();
+
+    // Easing functions
+    function easeOutCubic(x) {
+      return 1 - Math.pow(1 - x, 3);
+    }
+    function easeInCubic(x) {
+      return x * x * x;
+    }
+    function easeInOutCubic(x) {
+      return x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+    }
+
+    // Keyframe timeline (~1.0 s total: wind-up -> fast strike -> recovery)
+    const swingKeyframes = [
+      {
+        t: 0.00,
+        armX: 0, armY: 0, armZ: 0,
+        forearmX: 0, handX: 0,
+        torsoX: 0, torsoY: 0,
+        orcX: 0, leftArmX: 0, rightLegX: 0
+      },
+      {
+        // Wind-up (0.0 -> 0.35 s, ease-out): raise axe high overhead, twist torso & lean back
+        t: 0.35,
+        armX: -2.10, armY: -0.25, armZ: 0.45,
+        forearmX: 0.35, handX: -0.35,
+        torsoX: -0.25, torsoY: -0.35,
+        orcX: -0.10, leftArmX: 0.45, rightLegX: 0.24
+      },
+      {
+        // Strike (0.35 -> 0.55 s, ease-in, fast): snap axe down-forward in a heavy arc
+        t: 0.55,
+        armX: -0.15, armY: 0.25, armZ: 0.32,
+        forearmX: 0.45, handX: 1.05,
+        torsoX: 0.38, torsoY: 0.32,
+        orcX: 0.14, leftArmX: -0.52, rightLegX: -0.18
+      },
+      {
+        // Recovery (0.55 -> 1.00 s, ease-in-out): return smoothly to resting combat pose
+        t: 1.00,
+        armX: 0, armY: 0, armZ: 0,
+        forearmX: 0, handX: 0,
+        torsoX: 0, torsoY: 0,
+        orcX: 0, leftArmX: 0, rightLegX: 0
+      }
+    ];
+
+    function sampleSwingPose(t) {
+      let k0 = swingKeyframes[0];
+      let k1 = swingKeyframes[1];
+      let easeFn = easeOutCubic;
+
+      if (t < 0.35) {
+        k0 = swingKeyframes[0];
+        k1 = swingKeyframes[1];
+        easeFn = easeOutCubic;
+      } else if (t < 0.55) {
+        k0 = swingKeyframes[1];
+        k1 = swingKeyframes[2];
+        easeFn = easeInCubic;
+      } else {
+        k0 = swingKeyframes[2];
+        k1 = swingKeyframes[3];
+        easeFn = easeInOutCubic;
+      }
+
+      const rawAlpha = THREE.MathUtils.clamp((t - k0.t) / (k1.t - k0.t), 0, 1);
+      const a = easeFn(rawAlpha);
+
+      const pose = {};
+      for (const key of Object.keys(k0)) {
+        if (key !== 't') {
+          pose[key] = THREE.MathUtils.lerp(k0[key], k1[key], a);
+        }
+      }
+      return pose;
+    }
+
+    function playAttack() {
+      if (isAttacking) return;
+      isAttacking = true;
+      attackElapsed = 0;
+      impactTriggered = false;
+
+      const btn = document.getElementById('attackBtn');
+      if (btn) btn.classList.add('attacking');
+
+      playWhooshSound();
+    }
+
+    // =========================================================================
+    // 7. UI SETUP & ANIMATION LOOP
+    // =========================================================================
+    function setupUI() {
+      const btn = document.getElementById('attackBtn');
+      btn.addEventListener('click', playAttack);
+
+      window.addEventListener('keydown', (e) => {
+        if (e.code === 'Space' && !e.repeat) {
+          e.preventDefault();
+          playAttack();
+        }
+      });
+
+      window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      });
+    }
+
+    const clock = new THREE.Clock();
+
+    function updateAnimation(dt, totalTime) {
+      // Idle breathing & subtle sway
+      const breath = Math.sin(totalTime * 2.4);
+      const sway = Math.cos(totalTime * 1.6);
+
+      // Subtle orbiting hero light & blade rim glow
+      if (heroLight) {
+        heroLight.position.x = Math.cos(totalTime * 0.7) * 3.0;
+        heroLight.position.z = Math.sin(totalTime * 0.7) * 3.0 + 1.2;
+      }
+
+      if (isAttacking) {
+        attackElapsed += dt;
+        const t = Math.min(attackElapsed, 1.0);
+        const pose = sampleSwingPose(t);
+
+        // Trigger impact effect & camera shake right as the strike lands (~0.55 s)
+        if (!impactTriggered && attackElapsed >= 0.53) {
+          impactTriggered = true;
+          shakeRemaining = 0.16; // ~160 ms camera shake
+          spawnImpactEffect();
+          playImpactSound();
+        }
+
+        // Apply animated keyframe offsets on top of rest pose
+        rig.orc.rotation.x = rig.rest.orcX + pose.orcX;
+        rig.torso.rotation.x = rig.rest.torsoX + pose.torsoX;
+        rig.torso.rotation.y = rig.rest.torsoY + pose.torsoY;
+        rig.torso.scale.set(1, 1, 1);
+
+        rig.head.rotation.x = rig.rest.headX - pose.torsoX * 0.35;
+        rig.head.rotation.y = rig.rest.headY - pose.torsoY * 0.4;
+
+        rig.rightArmGroup.rotation.x = rig.rest.rightArmX + pose.armX;
+        rig.rightArmGroup.rotation.y = rig.rest.rightArmY + pose.armY;
+        rig.rightArmGroup.rotation.z = rig.rest.rightArmZ + pose.armZ;
+
+        rig.rightForearmGroup.rotation.x = rig.rest.rightForearmX + pose.forearmX;
+        rig.rightHandGroup.rotation.x = rig.rest.rightHandX + pose.handX;
+
+        rig.leftArmGroup.rotation.x = rig.rest.leftArmX + pose.leftArmX;
+        rig.rightLeg.rotation.x = rig.rest.rightLegX + pose.rightLegX;
+
+        // Intensify axe glow during the strike
+        const glowBoost = t > 0.25 && t < 0.65 ? 1.4 : 0.25;
+        for (const mat of axeBladeMats) {
+          mat.emissiveIntensity = glowBoost;
+        }
+        if (axeRimLight) {
+          axeRimLight.intensity = t > 0.35 && t < 0.65 ? 5.5 : 2.2;
+        }
+
+        if (attackElapsed >= 1.0) {
+          isAttacking = false;
+          const btn = document.getElementById('attackBtn');
+          if (btn) btn.classList.remove('attacking');
+        }
+      } else {
+        // Gentle idle breathing and combat readiness sway
+        rig.orc.rotation.x = rig.rest.orcX;
+        rig.torso.scale.set(1 + breath * 0.014, 1 + breath * 0.022, 1 + breath * 0.014);
+        rig.torso.rotation.x = rig.rest.torsoX + breath * 0.025;
+        rig.torso.rotation.y = rig.rest.torsoY + sway * 0.03;
+
+        rig.head.rotation.x = rig.rest.headX - breath * 0.02;
+        rig.head.rotation.y = rig.rest.headY + sway * 0.04;
+
+        rig.rightArmGroup.rotation.x = rig.rest.rightArmX + breath * 0.045;
+        rig.rightArmGroup.rotation.y = rig.rest.rightArmY;
+        rig.rightArmGroup.rotation.z = rig.rest.rightArmZ - breath * 0.02;
+        rig.rightForearmGroup.rotation.x = rig.rest.rightForearmX + sway * 0.03;
+        rig.rightHandGroup.rotation.x = rig.rest.rightHandX;
+
+        rig.leftArmGroup.rotation.x = rig.rest.leftArmX - breath * 0.035;
+        rig.rightLeg.rotation.x = rig.rest.rightLegX;
+
+        for (const mat of axeBladeMats) {
+          mat.emissiveIntensity = 0.22 + (breath * 0.5 + 0.5) * 0.15;
+        }
+      }
+
+      // Update active impact particles & shockwave ring
+      updateImpactEffects(dt);
+    }
+
+    function animate() {
+      requestAnimationFrame(animate);
+
+      const dt = Math.min(clock.getDelta(), 0.1);
+      const totalTime = clock.getElapsedTime();
+
+      // Remove previous frame's camera shake offset before OrbitControls updates
+      camera.position.sub(shakeOffset);
+      shakeOffset.set(0, 0, 0);
+
+      controls.update();
+      updateAnimation(dt, totalTime);
+
+      // Apply short camera shake during impact (~150 ms)
+      if (shakeRemaining > 0) {
+        shakeRemaining = Math.max(0, shakeRemaining - dt);
+        const mag = (shakeRemaining / 0.16) * 0.16;
+        shakeOffset.set(
+          (Math.random() - 0.5) * mag,
+          (Math.random() - 0.5) * mag,
+          (Math.random() - 0.5) * mag
+        );
+        camera.position.add(shakeOffset);
+      }
+
+      renderer.render(scene, camera);
+    }
+
+    // Initialize everything
+    setupLights();
+    createOrc();
+    setupUI();
+    animate();
+  </script>
+</body>
+</html>

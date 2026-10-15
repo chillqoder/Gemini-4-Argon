@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <link rel="icon" href="data:," />
+  <title>Low Poly Mario — World 1-1</title>
+  <style>
+    :root {
+      --ui-bg: rgba(38, 59, 54, 0.92);
+      --ui-bg-solid: #263B36;
+      --ui-border: rgba(255, 246, 217, 0.25);
+      --ui-text: #FFF6D9;
+      --ui-accent: #FAD02C;
+      --ui-danger: #FF6B57;
+      --ui-green: #4EB946;
+    }
+
+    * {
+      box-sizing: border-box;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-touch-callout: none;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #9DD8ED;
+      color: var(--ui-text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+
+    #game-root {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    #canvas-container {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+    }
+
+    #canvas-container canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    /* Compact Top HUD */
+    #hud-bar {
+      position: absolute;
+      top: 10px;
+      left: 12px;
+      right: 12px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      z-index: 20;
+      pointer-events: none;
+    }
+
+    .hud-stats {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 6px 12px;
+      background: var(--ui-bg);
+      border: 2px solid var(--ui-border);
+      border-radius: 10px;
+      padding: 6px 12px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+      pointer-events: auto;
+    }
+
+    .hud-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-width: 48px;
+    }
+
+    .hud-label {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      opacity: 0.82;
+    }
+
+    .hud-value {
+      font-size: 15px;
+      font-weight: 800;
+      font-variant-numeric: tabular-nums;
+      color: var(--ui-text);
+    }
+
+    .hud-value.low-time {
+      color: var(--ui-danger);
+    }
+
+    #hud-star-pill {
+      background: linear-gradient(90deg, #ffcf26, #ff6b57);
+      color: #1c2826;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 800;
+    }
+
+    .hud-progress-wrap {
+      display: flex;
+       flex-direction: column;
+      gap: 3px;
+      min-width: 90px;
+    }
+
+    .hud-progress-track {
+      width: 96px;
+      height: 7px;
+      background: rgba(0, 0, 0, 0.38);
+      border-radius: 999px;
+      overflow: hidden;
+      border: 1px solid rgba(255, 246, 217, 0.22);
+    }
+
+    #hud-progress-fill {
+      width: 0%;
+      height: 100%;
+      background: var(--ui-accent);
+      transition: width 0.08s linear;
+    }
+
+    .hud-actions {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      pointer-events: auto;
+    }
+
+    .hud-btn {
+      background: var(--ui-bg);
+      color: var(--ui-text);
+      border: 2px solid var(--ui-border);
+      border-radius: 8px;
+      padding: 6px 11px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 3px 8px rgba(0, 0, 0, 0.22);
+    }
+
+    .hud-btn:hover {
+      border-color: var(--ui-accent);
+    }
+
+    /* Floating score popups */
+    #popups-layer {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 15;
+      overflow: hidden;
+    }
+
+    .floating-popup {
+      position: absolute;
+      top: 0;
+      left: 0;
+      margin-left: -24px;
+      margin-top: -12px;
+      font-size: 15px;
+      font-weight: 900;
+      color: #FFF6D9;
+      text-shadow: 0 2px 0 #1b2a26, 0 0 6px rgba(0, 0, 0, 0.55);
+      pointer-events: none;
+      will-change: transform, opacity;
+    }
+
+    .floating-popup.popup-1up {
+      color: #7EFF6B;
+      font-size: 17px;
+    }
+
+    .floating-popup.popup-secret,
+    .floating-popup.popup-checkpoint {
+      color: #FAD02C;
+      font-size: 16px;
+    }
+
+    /* Modal Overlay */
+    #overlay-container {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      background: rgba(18, 30, 28, 0.48);
+      backdrop-filter: blur(3px);
+      z-index: 30;
+    }
+
+    #overlay-container[hidden] {
+      display: none !important;
+    }
+
+    .overlay-panel {
+      width: min(460px, 94vw);
+      max-height: calc(100vh - 32px);
+      overflow-y: auto;
+      background: var(--ui-bg-solid);
+      border: 3px solid var(--ui-accent);
+      border-radius: 14px;
+      padding: 20px 22px;
+      text-align: center;
+      box-shadow: 0 14px 36px rgba(0, 0, 0, 0.45);
+    }
+
+    #overlay-title {
+      margin: 0 0 6px;
+      font-size: 28px;
+      font-weight: 900;
+      color: var(--ui-accent);
+      letter-spacing: 0.02em;
+    }
+
+    #overlay-subtitle {
+      margin: 0 0 14px;
+      font-size: 14px;
+      line-height: 1.4;
+      opacity: 0.92;
+    }
+
+    .records-banner {
+      display: flex;
+      justify-content: space-around;
+      gap: 10px;
+      background: rgba(0, 0, 0, 0.25);
+      border-radius: 8px;
+      padding: 8px 10px;
+      margin-bottom: 12px;
+      font-size: 13px;
+    }
+
+    .controls-card {
+      text-align: left;
+      background: rgba(0, 0, 0, 0.22);
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-size: 13px;
+      line-height: 1.65;
+      margin-bottom: 14px;
+    }
+
+    .new-best-badge {
+      display: inline-block;
+      background: var(--ui-accent);
+      color: #1c2826;
+      font-weight: 900;
+      font-size: 12px;
+      padding: 3px 10px;
+      border-radius: 999px;
+      margin-bottom: 10px;
+      letter-spacing: 0.06em;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 7px;
+      text-align: left;
+      margin-bottom: 14px;
+    }
+
+    .stats-grid > div {
+      background: rgba(0, 0, 0, 0.24);
+      padding: 7px 10px;
+      border-radius: 7px;
+      display: flex;
+      flex-direction: column;
+      font-size: 12px;
+    }
+
+    .stats-grid > div span {
+      opacity: 0.78;
+      font-size: 11px;
+    }
+
+    .stats-grid > div strong {
+      font-size: 14px;
+      color: var(--ui-accent);
+    }
+
+    .overlay-buttons {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+    }
+
+    .primary-btn, .secondary-btn {
+      border: none;
+      border-radius: 9px;
+      padding: 10px 22px;
+      font-size: 15px;
+      font-weight: 800;
+      cursor: pointer;
+    }
+
+    .primary-btn {
+      background: var(--ui-accent);
+      color: #1c2826;
+    }
+
+    .secondary-btn {
+      background: rgba(255, 246, 217, 0.14);
+      color: var(--ui-text);
+      border: 1px solid var(--ui-border);
+    }
+
+    /* Touch Controls */
+    #touch-controls {
+      position: absolute;
+      left: 12px;
+      right: 12px;
+      bottom: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      pointer-events: none;
+      z-index: 22;
+    }
+
+    .touch-cluster {
+      display: flex;
+      gap: 8px;
+      pointer-events: auto;
+    }
+
+    .touch-btn {
+      width: 54px;
+      height: 54px;
+      border-radius: 14px;
+      border: 2px solid var(--ui-border);
+      background: rgba(38, 59, 54, 0.78);
+      color: var(--ui-text);
+      font-size: 14px;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      touch-action: none;
+      cursor: pointer;
+    }
+
+    .touch-btn.active {
+      background: var(--ui-accent);
+      color: #1c2826;
+      border-color: #fff;
+    }
+
+    @media (max-width: 640px), (max-height: 480px) {
+      #hud-bar {
+        top: 6px;
+        left: 6px;
+        right: 6px;
+        gap: 4px;
+      }
+      .hud-stats {
+        padding: 4px 8px;
+        gap: 4px 8px;
+      }
+      .hud-item {
+        min-width: 38px;
+      }
+      .hud-value {
+        font-size: 13px;
+      }
+      .overlay-panel {
+        padding: 14px 16px;
+      }
+      #overlay-title {
+        font-size: 22px;
+      }
+      .touch-btn {
+        width: 48px;
+        height: 48px;
+        font-size: 12px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="game-root">
+    <div id="canvas-container" aria-label="Low Poly Mario 3D World"></div>
+
+    <header id="hud-bar" aria-label="Game Status">
+      <div class="hud-stats">
+        <div class="hud-item">
+          <span class="hud-label">Score</span>
+          <span class="hud-value" id="hud-score">000000</span>
+        </div>
+        <div class="hud-item">
+          <span class="hud-label">Coins</span>
+          <span class="hud-value" id="hud-coins">00</span>
+        </div>
+        <div class="hud-item">
+          <span class="hud-label">World</span>
+          <span class="hud-value" id="hud-world">1-1</span>
+        </div>
+        <div class="hud-item">
+          <span class="hud-label">Time</span>
+          <span class="hud-value" id="hud-time">300</span>
+        </div>
+        <div class="hud-item">
+          <span class="hud-label">Lives</span>
+          <span class="hud-value" id="hud-lives">3</span>
+        </div>
+        <div class="hud-item">
+          <span class="hud-label">Power</span>
+          <span class="hud-value" id="hud-power">Small</span>
+        </div>
+        <div class="hud-item">
+          <span class="hud-label">Secrets</span>
+          <span class="hud-value" id="hud-secrets">0/3</span>
+        </div>
+        <div id="hud-star-pill" hidden>
+          STAR <span id="hud-star-time">10.0s</span>
+        </div>
+        <div class="hud-progress-wrap" title="Course Progress">
+          <span class="hud-label">Course</span>
+          <div class="hud-progress-track">
+            <div id="hud-progress-fill"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="hud-actions">
+        <button type="button" class="hud-btn" id="btn-pause">Pause</button>
+        <button type="button" class="hud-btn" id="btn-mute" aria-pressed="false">Mute</button>
+        <button type="button" class="hud-btn" id="btn-restart">Restart</button>
+      </div>
+    </header>
+
+    <div id="popups-layer" aria-hidden="true"></div>
+
+    <section id="overlay-container" role="dialog" aria-modal="true">
+      <div class="overlay-panel">
+        <h1 id="overlay-title">Low Poly Mario</h1>
+        <p id="overlay-subtitle">Reach the World 1-1 flagpole!</p>
+        <div id="overlay-stats"></div>
+        <div class="overlay-buttons">
+          <button type="button" class="primary-btn" id="overlay-primary-btn">Play</button>
+          <button type="button" class="secondary-btn" id="overlay-secondary-btn" hidden>Restart Run</button>
+        </div>
+      </div>
+    </section>
+
+    <nav id="touch-controls" aria-label="Touch Controls">
+      <div class="touch-cluster">
+        <button type="button" class="touch-btn" data-touch-action="left" aria-label="Move Left">Left</button>
+        <button type="button" class="touch-btn" data-touch-action="down" aria-label="Duck or Enter Pipe">Down</button>
+        <button type="button" class="touch-btn" data-touch-action="right" aria-label="Move Right">Right</button>
+      </div>
+      <div class="touch-cluster">
+        <button type="button" class="touch-btn" data-touch-action="run" aria-label="Run or Fireball">Run/Fire</button>
+        <button type="button" class="touch-btn" data-touch-action="jump" aria-label="Jump">Jump</button>
+      </div>
+    </nav>
+  </div>
+
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>
